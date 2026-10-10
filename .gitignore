@@ -1,0 +1,4 @@
+node_modules/
+package*.json
+web/index.html
+__pycache__/

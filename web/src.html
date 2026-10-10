@@ -1,0 +1,699 @@
+<title>山药蛋工具箱-图片级深度pdf去水印（初始版）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 布局：左侧参数面板 + 右侧对比预览，下方处理日志；窄屏上下堆叠 */
+:root{
+  --bg:#f3f5f4; --panel:#ffffff; --ink:#1d2624; --muted:#5d6a67; --line:#d6dddb;
+  --accent:#0d6e6e; --accent-ink:#ffffff; --accent-soft:#e1efee;
+  --warn:#a35a00; --ok:#2f7a3d; --err:#b23a2f; --sheet:#ffffff; --sheet-shadow:rgba(20,40,38,.12);
+  --f-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141a19; --panel:#1c2423; --ink:#e4ebe9; --muted:#9aa8a5; --line:#2e3a38;
+  --accent:#4fb3b0; --accent-ink:#0d1716; --accent-soft:#1f3433;
+  --warn:#e0a35a; --ok:#79c48a; --err:#ef8a7f; --sheet:#f7f7f5; --sheet-shadow:rgba(0,0,0,.5); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141a19; --panel:#1c2423; --ink:#e4ebe9; --muted:#9aa8a5; --line:#2e3a38;
+  --accent:#4fb3b0; --accent-ink:#0d1716; --accent-soft:#1f3433;
+  --warn:#e0a35a; --ok:#79c48a; --err:#ef8a7f; --sheet:#f7f7f5; --sheet-shadow:rgba(0,0,0,.5); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;margin:0}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:20px;padding-block:20px 40px;display:grid;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;border-bottom:1px solid var(--line);padding-bottom:12px}
+h1{font-size:22px;font-weight:700;margin:0;letter-spacing:.02em;text-wrap:balance}
+h1 .brand{color:var(--accent)}
+h1 .sub{font-weight:500}
+header p{margin:0;color:var(--muted);max-width:70ch}
+.main{display:grid;grid-template-columns:320px minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.main{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:14px;min-width:0}
+.panel h2{font-size:13px;font-weight:700;margin:0;color:var(--muted);letter-spacing:.08em}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;text-align:center;cursor:pointer;display:grid;gap:4px;transition:border-color .15s,background .15s}
+.drop:hover,.drop.on{border-color:var(--accent);background:var(--accent-soft)}
+.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.drop b{font-weight:500}
+.drop small{color:var(--muted)}
+.fileinfo{font-family:var(--f-mono);font-size:12px;color:var(--muted);word-break:break-all}
+.field{display:grid;gap:4px}
+.field label,.lab{font-size:13px;font-weight:500}
+.hint{font-size:12px;color:var(--muted)}
+input[type=text],input[type=number],select{font:inherit;font-family:var(--f-mono);font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.check{display:flex;gap:8px;align-items:flex-start}
+.check input{margin-top:4px;accent-color:var(--accent)}
+.radio{display:flex;gap:14px;flex-wrap:wrap}
+.radio label{display:flex;gap:6px;align-items:center;font-weight:400}
+.radio input{accent-color:var(--accent)}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-size:13px;font-weight:500;color:var(--muted)}
+details .grid{display:grid;gap:10px;margin-top:10px}
+button{font:inherit;font-size:14px;font-weight:500;border-radius:6px;padding:8px 14px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button:hover:not(:disabled){border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.actions{display:grid;gap:8px}
+.view{display:grid;gap:14px;min-width:0}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:560px){.cmp{grid-template-columns:1fr}}
+figure{margin:0;display:grid;gap:6px;min-width:0}
+figcaption{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.sheet{background:var(--sheet);box-shadow:0 1px 3px var(--sheet-shadow);border-radius:3px;overflow:hidden;cursor:crosshair;line-height:0}
+.sheet canvas{width:100%;height:auto;display:block}
+.zoom{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.zoom .sheet{cursor:default}
+.zoomhead{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.status{display:grid;gap:8px}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.msg{font-size:13px}
+.msg.err{color:var(--err)}
+.msg.ok{color:var(--ok)}
+.logwrap{overflow-x:auto;max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+th,td{padding:5px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel);color:var(--muted);font-weight:500}
+td.num{font-family:var(--f-mono);text-align:right}
+.pill{display:inline-block;padding:0 7px;border-radius:9px;font-size:11px;line-height:18px;border:1px solid currentColor}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.err{color:var(--err)}
+.note{font-size:12px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px;max-width:75ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><span class="brand">山药蛋工具箱</span><span class="sub">-图片级深度pdf去水印（初始版）</span></h1>
+    <p>CAD 出图 PDF 的灰色斜排水印清除、外框和标题栏去除。文件只在本机浏览器里处理，不会上传。</p>
+  </header>
+
+  <div class="main">
+    <aside class="panel" aria-label="参数">
+      <h2>文件</h2>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="选择 PDF 文件">
+        <b>拖入 PDF，或点击选择</b>
+        <small>每页为整幅位图的出图 PDF 效果最好</small>
+      </div>
+      <input type="file" id="file" accept="application/pdf,.pdf" hidden>
+      <div class="fileinfo" id="fileinfo">当前显示：内置示例图（非真实图纸）</div>
+
+      <h2>范围</h2>
+      <div class="field">
+        <label for="range">处理页码</label>
+        <input type="text" id="range" placeholder="全部" value="">
+        <span class="hint">如 5-94，或 5-20,30,41-50；留空为全部</span>
+      </div>
+      <div class="field">
+        <span class="lab">范围外的页</span>
+        <div class="radio">
+          <label><input type="radio" name="outside" id="out-drop" value="drop" checked>不输出</label>
+          <label><input type="radio" name="outside" id="out-keep" value="keep">原样保留</label>
+        </div>
+      </div>
+
+      <h2>处理</h2>
+      <label class="check"><input type="checkbox" id="do-wm" checked><span><b>去水印</b><br><span class="hint">识别 RGB≈128 的粗笔画灰字，按正片叠底反算还原，压在水印下的线条完整保留</span></span></label>
+      <label class="check"><input type="checkbox" id="do-frame" checked><span><b>去图框</b><br><span class="hint">定位最粗的长线作内框，右侧长竖线作标题栏边线，框外全部涂白</span></span></label>
+      <div class="field">
+        <label for="dpi">输出分辨率</label>
+        <select id="dpi">
+          <option value="300">300 dpi（A3 约 4960×3508，文件小）</option>
+          <option value="400" selected>400 dpi（A3 约 6614×4677，推荐）</option>
+          <option value="600">600 dpi（A3 约 9921×7016，接近原图）</option>
+        </select>
+      </div>
+
+      <details>
+        <summary>高级参数</summary>
+        <div class="grid">
+          <div class="row2">
+            <div class="field"><label for="gray">水印灰度</label><input type="number" id="gray" value="128" min="60" max="220"></div>
+            <div class="field"><label for="tol">容差</label><input type="number" id="tol" value="4" min="1" max="20"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="stroke">最细笔画 mm</label><input type="number" id="stroke" value="0.2" step="0.05" min="0.1" max="1"></div>
+            <div class="field"><label for="reach">墙缝延伸 mm</label><input type="number" id="reach" value="1.2" step="0.1" min="0" max="5"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="pad">图框内缩 px</label><input type="number" id="pad" value="3" min="0" max="60"></div>
+            <div class="field"><label for="tbmin">标题栏起点</label><input type="number" id="tbmin" value="0.70" step="0.01" min="0.5" max="0.98"></div>
+          </div>
+          <span class="hint">“最细笔画”以下的灰线视为图纸内容不处理（CAD 8 号色细线就是 128 灰）。“标题栏起点”是相对图宽的比例，标题栏左边线须在它右侧。</span>
+        </div>
+      </details>
+
+      <div class="actions">
+        <div class="row">
+          <label for="pv" class="lab">预览第</label>
+          <input type="number" id="pv" value="1" min="1" style="width:80px">
+          <span class="lab">页</span>
+          <button id="btn-preview">预览</button>
+        </div>
+        <button class="primary" id="btn-run" disabled>批量处理并生成 PDF</button>
+        <button id="btn-save" disabled>下载结果 PDF</button>
+      </div>
+    </aside>
+
+    <section class="view">
+      <div class="cmp">
+        <figure><figcaption><span>原图</span><span id="cap-a"></span></figcaption><div class="sheet" id="sheet-a"><canvas id="cv-a"></canvas></div></figure>
+        <figure><figcaption><span>处理后</span><span id="cap-b"></span></figcaption><div class="sheet" id="sheet-b"><canvas id="cv-b"></canvas></div></figure>
+      </div>
+      <div>
+        <div class="zoomhead"><span>点击上图任意位置，下面按 1:1 像素放大对照</span><span id="zoompos"></span></div>
+        <div class="zoom">
+          <div class="sheet"><canvas id="zm-a" width="480" height="300"></canvas></div>
+          <div class="sheet"><canvas id="zm-b" width="480" height="300"></canvas></div>
+        </div>
+      </div>
+      <div class="status panel">
+        <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+        <div class="msg" id="msg">示例图已处理。拖入你的 PDF 开始。</div>
+        <div class="logwrap">
+          <table>
+            <thead><tr><th>页</th><th>尺寸 px</th><th>水印像素</th><th>图框</th><th>输出</th><th>用时</th></tr></thead>
+            <tbody id="log"></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="note">适用条件：水印是灰色斜排文字、以“正片叠底”方式叠在白底图纸上（白底处显示为 RGB 128 灰），图框有一圈粗内框线和右侧整列标题栏。彩色扫描件（资质证书等）不在处理范围内，请用页码范围排除。处理后每页都是位图；原文件是矢量页的，输出也会变成位图，且页面里未嵌入字体的中文文字对象（多数情况下正是水印本身）可能不显示。</p>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script>
+"use strict";
+
+/* ===================== 页面水印（闭合 Shadow DOM + 自动恢复） ===================== */
+(function () {
+  const TXT = "肖向忠  中国市政华北总院  15822913443";
+  let url = "", host = null, inner = null;
+  function tile() {
+    const dpr = Math.max(1, window.devicePixelRatio || 1), w = 380, h = 220;
+    const c = document.createElement("canvas"); c.width = w * dpr; c.height = h * dpr;
+    const x = c.getContext("2d"); x.scale(dpr, dpr);
+    x.translate(w / 2, h / 2); x.rotate(-Math.PI / 7.5);
+    x.font = '500 15px "Noto Sans SC","Microsoft YaHei",sans-serif';
+    x.textAlign = "center"; x.textBaseline = "middle";
+    x.fillStyle = "rgba(128,128,128,0.16)"; x.fillText(TXT, 0, 0);
+    return c.toDataURL("image/png");
+  }
+  const HOST_CSS = "position:fixed!important;inset:0!important;z-index:2147483647!important;pointer-events:none!important;display:block!important;opacity:1!important;visibility:visible!important;margin:0!important;padding:0!important;border:0!important;transform:none!important;filter:none!important;clip-path:none!important;";
+  function innerCss() { return "position:absolute;inset:0;pointer-events:none;background-repeat:repeat;background-image:url(" + url + ");"; }
+  function build() {
+    if (!url) url = tile();
+    host = document.createElement("div");
+    host.setAttribute("aria-hidden", "true");
+    host.setAttribute("style", HOST_CSS);
+    const root = host.attachShadow ? host.attachShadow({ mode: "closed" }) : host;
+    inner = document.createElement("div"); inner.setAttribute("style", innerCss());
+    root.appendChild(inner);
+    document.body.appendChild(host);
+  }
+  function healthy() {
+    if (!host || !host.isConnected || host.parentNode !== document.body) return false;
+    if (host.getAttribute("style") !== HOST_CSS) return false;
+    if (!inner || !inner.isConnected || inner.getAttribute("style") !== innerCss()) return false;
+    const cs = getComputedStyle(host);
+    if (cs.display === "none" || cs.visibility !== "visible" || +cs.opacity < 1 || cs.position !== "fixed") return false;
+    const r = host.getBoundingClientRect();
+    if (r.width < innerWidth * 0.9 || r.height < innerHeight * 0.9) return false;
+    if (document.body.lastElementChild !== host) return false;
+    return true;
+  }
+  function ensure() {
+    if (healthy()) return;
+    try { if (host && host.parentNode) host.parentNode.removeChild(host); } catch (e) {}
+    build();
+  }
+  function start() {
+    ensure();
+    new MutationObserver(ensure).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "hidden"] });
+    setInterval(ensure, 1500);
+    addEventListener("resize", ensure);
+  }
+  if (document.body) start(); else addEventListener("DOMContentLoaded", start);
+})();
+/* ===================== 形态学与连通域（Uint8Array 0/1 掩膜） ===================== */
+const odd = n => { n = Math.round(n); return n % 2 ? n : n + 1; };
+
+function box1D(src, W, H, r, horiz, dil) {           // 一维滑窗：方形核的一半
+  const dst = new Uint8Array(W * H);
+  if (horiz) {
+    for (let y = 0; y < H; y++) {
+      const o = y * W; let s = 0;
+      for (let x = 0; x < Math.min(r, W); x++) s += src[o + x];
+      for (let x = 0; x < W; x++) {
+        if (x + r < W) s += src[o + x + r];
+        if (x - r - 1 >= 0) s -= src[o + x - r - 1];
+        const len = Math.min(W - 1, x + r) - Math.max(0, x - r) + 1;
+        dst[o + x] = dil ? (s > 0 ? 1 : 0) : (s === len ? 1 : 0);
+      }
+    }
+  } else {
+    const s = new Int32Array(W);
+    for (let y = 0; y < Math.min(r, H); y++) { const o = y * W; for (let x = 0; x < W; x++) s[x] += src[o + x]; }
+    for (let y = 0; y < H; y++) {
+      if (y + r < H) { const o = (y + r) * W; for (let x = 0; x < W; x++) s[x] += src[o + x]; }
+      if (y - r - 1 >= 0) { const o = (y - r - 1) * W; for (let x = 0; x < W; x++) s[x] -= src[o + x]; }
+      const len = Math.min(H - 1, y + r) - Math.max(0, y - r) + 1, o = y * W;
+      if (dil) for (let x = 0; x < W; x++) dst[o + x] = s[x] > 0 ? 1 : 0;
+      else for (let x = 0; x < W; x++) dst[o + x] = s[x] === len ? 1 : 0;
+    }
+  }
+  return dst;
+}
+const square = (m, W, H, r, dil) => box1D(box1D(m, W, H, r, true, dil), W, H, r, false, dil);
+function cross(m, W, H, dil) {                        // 3×3 十字核
+  const d = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const o = y * W;
+    for (let x = 0; x < W; x++) {
+      const i = o + x, c = m[i];
+      const l = x > 0 ? m[i - 1] : c, rr = x < W - 1 ? m[i + 1] : c;
+      const u = y > 0 ? m[i - W] : c, dn = y < H - 1 ? m[i + W] : c;
+      d[i] = dil ? (c | l | rr | u | dn) : (c & l & rr & u & dn);
+    }
+  }
+  return d;
+}
+function disk(m, W, H, r, dil) {                      // 近似圆形核：方/十字交替
+  if (r <= 0) return m;
+  if (r === 1) return cross(m, W, H, dil);
+  let o = m;
+  for (let i = 0; i < r; i++) o = (i % 2 === 0) ? square(o, W, H, 1, dil) : cross(o, W, H, dil);
+  return o;
+}
+const erode = (m, W, H, r) => disk(m, W, H, r, false);
+const dilate = (m, W, H, r) => disk(m, W, H, r, true);
+const opening = (m, W, H, r) => dilate(erode(m, W, H, r), W, H, r);
+const closing = (m, W, H, r) => erode(dilate(m, W, H, r), W, H, r);
+
+function components(mask, W, H) {                    // 8 连通两遍扫描
+  const lab = new Int32Array(W * H);
+  let par = new Int32Array(4096); let n = 1;
+  const find = a => { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; };
+  const uni = (a, b) => { a = find(a); b = find(b); if (a !== b) { if (a < b) par[b] = a; else par[a] = b; } };
+  for (let y = 0; y < H; y++) {
+    const o = y * W;
+    for (let x = 0; x < W; x++) {
+      const i = o + x; if (!mask[i]) continue;
+      let m = 0;
+      const nb = [x > 0 ? lab[i - 1] : 0, y > 0 && x > 0 ? lab[i - W - 1] : 0, y > 0 ? lab[i - W] : 0, y > 0 && x < W - 1 ? lab[i - W + 1] : 0];
+      for (const v of nb) if (v && (!m || v < m)) m = v;
+      if (!m) {
+        if (n >= par.length) { const p2 = new Int32Array(par.length * 2); p2.set(par); par = p2; }
+        par[n] = n; m = n++;
+      } else for (const v of nb) if (v && v !== m) uni(m, v);
+      lab[i] = m;
+    }
+  }
+  const root = new Int32Array(n); let k = 0;
+  for (let i = 1; i < n; i++) { const r = find(i); if (r === i) root[i] = ++k; }
+  for (let i = 1; i < n; i++) root[i] = root[find(i)];
+  const minx = new Int32Array(k + 1).fill(1e9), miny = new Int32Array(k + 1).fill(1e9),
+        maxx = new Int32Array(k + 1).fill(-1), maxy = new Int32Array(k + 1).fill(-1), area = new Int32Array(k + 1);
+  for (let y = 0; y < H; y++) {
+    const o = y * W;
+    for (let x = 0; x < W; x++) {
+      const v = lab[o + x]; if (!v) continue;
+      const c = root[v]; lab[o + x] = c; area[c]++;
+      if (x < minx[c]) minx[c] = x; if (x > maxx[c]) maxx[c] = x;
+      if (y < miny[c]) miny[c] = y; if (y > maxy[c]) maxy[c] = y;
+    }
+  }
+  return { lab, n: k + 1, minx, miny, maxx, maxy, area };
+}
+
+/* ===================== 去水印 ===================== */
+// rgba: ImageData.data（原地修改）。返回处理像素数
+function removeWatermark(rgba, W, H, ppm, P) {
+  const N = W * H, G = P.gray, tol = P.tol, F = G / 255;
+  const k = Math.max(3, odd(P.stroke * ppm)), r = (k - 1) >> 1;
+  const core = new Uint8Array(N), R = new Uint8Array(N);
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    const a = rgba[j], b = rgba[j + 1], c = rgba[j + 2];
+    if (Math.abs(a - G) <= tol && Math.abs(b - G) <= tol && Math.abs(c - G) <= tol) { core[i] = 1; R[i] = 1; }
+    else if (Math.min(a, b, c) < 110) R[i] = 1;
+  }
+  const thick = opening(core, W, H, r);                  // 粗笔画
+  const grow = dilate(thick, W, H, r + 1);
+  const wm = new Uint8Array(N);
+  for (let i = 0; i < N; i++) wm[i] = thick[i] | (core[i] & grow[i]);
+  // 沿“水印灰 + 深色线”延伸，找被墙线隔开的碎片
+  let reach = wm.slice();
+  const it = Math.max(1, Math.floor(P.reach * ppm / 2));
+  for (let t = 0; t < it; t++) { reach = square(reach, W, H, 2, true); for (let i = 0; i < N; i++) reach[i] &= R[i]; }
+  const rest = new Uint8Array(N);
+  for (let i = 0; i < N; i++) rest[i] = core[i] & (1 - wm[i]);
+  const ero = erode(rest, W, H, r);
+  const cc = components(rest, W, H);
+  const hit = new Uint8Array(cc.n), fat = new Uint8Array(cc.n);
+  for (let i = 0; i < N; i++) { const c = cc.lab[i]; if (c) { if (reach[i]) hit[c] = 1; if (ero[i]) fat[c] = 1; } }
+  const sel = new Uint8Array(cc.n), lim = 6 * k;
+  for (let c = 1; c < cc.n; c++) {
+    if (!hit[c]) continue;
+    const w = cc.maxx[c] - cc.minx[c] + 1, h = cc.maxy[c] - cc.miny[c] + 1;
+    const L = Math.max(w, h), S = Math.min(w, h);
+    const short = L <= lim && S >= 3 && cc.area[c] >= 0.25 * L * Math.max(S, 1);
+    if (fat[c] || short) sel[c] = 1;
+  }
+  let any = 0;
+  for (let i = 0; i < N; i++) { if (sel[cc.lab[i]] && cc.lab[i]) wm[i] = 1; any |= wm[i]; }
+  if (!any) return 0;
+  const inside = closing(wm, W, H, r);
+  const halo = dilate(inside, W, H, 2);
+  let cnt = 0;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    if (!halo[i]) continue;
+    const a = rgba[j], b = rgba[j + 1], c = rgba[j + 2];
+    if (!inside[i] && Math.max(a, b, c) < G - tol) continue;   // 水印外圈的深色像素 = 原线条边缘
+    rgba[j] = Math.min(255, Math.round(a / F));
+    rgba[j + 1] = Math.min(255, Math.round(b / F));
+    rgba[j + 2] = Math.min(255, Math.round(c / F));
+    cnt++;
+  }
+  return cnt;
+}
+
+/* ===================== 图框 ===================== */
+function clusters(idx, gap = 3) {
+  const out = [];
+  for (const i of idx) { const l = out[out.length - 1]; if (l && i - l[1] <= gap) l[1] = i; else out.push([i, i]); }
+  return out;
+}
+function detectFrame(rgba, W, H, tbMin) {
+  const LF = 0.6, rowsI = [], colsI = [];
+  const cur = new Int32Array(W), best = new Int32Array(W);
+  for (let y = 0; y < H; y++) {
+    let run = 0, mx = 0; const o = y * W;
+    for (let x = 0; x < W; x++) {
+      const j = (o + x) * 4, d = Math.min(rgba[j], rgba[j + 1], rgba[j + 2]) < 110;
+      if (d) { run++; if (run > mx) mx = run; cur[x]++; if (cur[x] > best[x]) best[x] = cur[x]; }
+      else { run = 0; cur[x] = 0; }
+    }
+    if (mx >= W * LF) rowsI.push(y);
+  }
+  for (let x = 0; x < W; x++) if (best[x] >= H * LF) colsI.push(x);
+  const rows = clusters(rowsI), cols = clusters(colsI);
+  // 取最粗的长线；一样粗时取最靠外的（图框在最外侧）
+  const pick = (cs, outerSmall) => cs.length ? cs.reduce((a, c) => {
+    const ta = a[1] - a[0], tc = c[1] - c[0];
+    if (tc !== ta) return tc > ta ? c : a;
+    return (outerSmall ? c[0] < a[0] : c[0] > a[0]) ? c : a;
+  }) : null;
+  const top = pick(rows.filter(c => c[0] < H * 0.35), true);
+  const bottom = pick(rows.filter(c => c[1] > H * 0.65), false);
+  const left = pick(cols.filter(c => c[0] < W * 0.25), true);
+  const right = pick(cols.filter(c => c[1] > W * 0.85), false);
+  if (!top || !bottom || !left || !right) return null;
+  const cand = cols.filter(c => c[0] > W * tbMin && c[0] < right[0] - 5);
+  return { top, bottom, left, right, titleLeft: cand.length ? cand[0] : null };
+}
+function blankOutside(rgba, W, H, fr, pad) {
+  const x0 = fr.left[1] + 1 + pad, y0 = fr.top[1] + 1 + pad;
+  const x1 = (fr.titleLeft || fr.right)[0] - pad, y1 = fr.bottom[0] - pad;
+  for (let y = 0; y < H; y++) {
+    const inY = y >= y0 && y < y1, o = y * W * 4;
+    if (!inY) { rgba.fill(255, o, o + W * 4); continue; }
+    rgba.fill(255, o, o + x0 * 4);
+    rgba.fill(255, o + x1 * 4, o + W * 4);
+  }
+  return [x0, y0, x1, y1];
+}
+
+/* ===================== 编码：PNG 预测器 + zlib，直接作 PDF 图像流 ===================== */
+function encodeImage(rgba, W, H) {
+  let gray = true;
+  for (let j = 0; j < rgba.length; j += 4 * 7) {
+    const a = rgba[j], b = rgba[j + 1], c = rgba[j + 2];
+    if (Math.abs(a - b) > 2 || Math.abs(b - c) > 2) { gray = false; break; }
+  }
+  const ch = gray ? 1 : 3, stride = W * ch + 1, raw = new Uint8Array(stride * H);
+  for (let y = 0; y < H; y++) {
+    const o = y * stride, s = y * W * 4; raw[o] = 1;            // Sub 滤波
+    if (gray) {
+      let prev = 0;
+      for (let x = 0; x < W; x++) { const v = rgba[s + x * 4 + 1]; raw[o + 1 + x] = (v - prev) & 255; prev = v; }
+    } else {
+      let pr = 0, pg = 0, pb = 0;
+      for (let x = 0; x < W; x++) {
+        const j = s + x * 4, r = rgba[j], g = rgba[j + 1], b = rgba[j + 2], q = o + 1 + x * 3;
+        raw[q] = (r - pr) & 255; raw[q + 1] = (g - pg) & 255; raw[q + 2] = (b - pb) & 255; pr = r; pg = g; pb = b;
+      }
+    }
+  }
+  return { data: pako.deflate(raw, { level: 6 }), ch };
+}
+
+/* ===================== 页面与状态 ===================== */
+const $ = id => document.getElementById(id);
+const S = { bytes: null, name: "", pdf: null, numPages: 0, result: null, resultName: "", before: null, after: null, W: 0, H: 0 };
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const params = () => ({
+  gray: +$("gray").value || 128, tol: +$("tol").value || 4, stroke: +$("stroke").value || 0.2,
+  reach: +$("reach").value || 0, pad: +$("pad").value || 0, tbMin: +$("tbmin").value || 0.7,
+  dpi: +$("dpi").value || 400, wm: $("do-wm").checked, frame: $("do-frame").checked
+});
+const nextFrame = () => new Promise(r => setTimeout(r, 0));
+function setMsg(t, cls = "") { const m = $("msg"); m.textContent = t; m.className = "msg " + cls; }
+function setBar(f) { $("bar").style.width = Math.round(f * 100) + "%"; }
+
+function parseRange(txt, n) {
+  txt = (txt || "").trim();
+  if (!txt) return Array.from({ length: n }, (_, i) => i + 1);
+  const set = new Set();
+  for (const part of txt.split(/[,，\s]+/)) {
+    if (!part) continue;
+    const m = part.match(/^(\d+)\s*[-~－]\s*(\d+)?$/);
+    if (m) { const a = +m[1], b = m[2] ? +m[2] : n; for (let i = Math.max(1, a); i <= Math.min(n, b); i++) set.add(i); }
+    else if (/^\d+$/.test(part)) { const v = +part; if (v >= 1 && v <= n) set.add(v); }
+    else throw new Error("页码格式看不懂：" + part);
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+function processRGBA(rgba, W, H, ppm, P) {
+  const t = performance.now();
+  let n = 0, fr = null;
+  if (P.wm) n = removeWatermark(rgba, W, H, ppm, P);
+  if (P.frame) { fr = detectFrame(rgba, W, H, P.tbMin); if (fr) blankOutside(rgba, W, H, fr, P.pad); }
+  return { n, fr, ms: performance.now() - t };
+}
+
+async function renderPage(no, dpi) {
+  const page = await S.pdf.getPage(no);
+  const vp1 = page.getViewport({ scale: 1 });
+  const vp = page.getViewport({ scale: dpi / 72 });
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+  await page.render({ canvasContext: ctx, viewport: vp, background: "rgb(255,255,255)" }).promise;
+  const img = ctx.getImageData(0, 0, cv.width, cv.height);
+  page.cleanup();
+  return { img, wPt: vp1.width, hPt: vp1.height };
+}
+
+function showCompare(beforeImg, afterImg) {
+  S.before = beforeImg; S.after = afterImg; S.W = beforeImg.width; S.H = beforeImg.height;
+  for (const [id, im] of [["cv-a", beforeImg], ["cv-b", afterImg]]) {
+    const cv = $(id), sc = Math.min(1, 1400 / im.width);
+    cv.width = Math.round(im.width * sc); cv.height = Math.round(im.height * sc);
+    const tmp = document.createElement("canvas"); tmp.width = im.width; tmp.height = im.height;
+    tmp.getContext("2d").putImageData(im, 0, 0);
+    const c = cv.getContext("2d"); c.imageSmoothingQuality = "high"; c.drawImage(tmp, 0, 0, cv.width, cv.height);
+  }
+  $("cap-a").textContent = $("cap-b").textContent = beforeImg.width + "×" + beforeImg.height;
+  zoomAt(0.42, 0.3);
+}
+function zoomAt(fx, fy) {
+  if (!S.before) return;
+  const zw = 480, zh = 300;
+  const x = Math.max(0, Math.min(S.W - zw, Math.round(fx * S.W - zw / 2)));
+  const y = Math.max(0, Math.min(S.H - zh, Math.round(fy * S.H - zh / 2)));
+  for (const [id, im] of [["zm-a", S.before], ["zm-b", S.after]]) {
+    const c = $(id).getContext("2d"); c.fillStyle = "#fff"; c.fillRect(0, 0, zw, zh);
+    c.putImageData(im, -x, -y, x, y, zw, zh);
+  }
+  $("zoompos").textContent = `x ${x}–${x + zw}，y ${y}–${y + zh}`;
+}
+for (const id of ["sheet-a", "sheet-b"]) $(id).addEventListener("click", e => {
+  const r = e.currentTarget.getBoundingClientRect(); zoomAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+});
+
+function logRow(no, W, H, res, out) {
+  const tr = document.createElement("tr");
+  const frame = res.fr ? '<span class="pill ok">已去除</span>' : (params().frame ? '<span class="pill warn">未识别</span>' : "—");
+  tr.innerHTML = `<td class="num">${no}</td><td class="num">${W}×${H}</td><td class="num">${res.n.toLocaleString()}</td><td>${frame}</td><td>${out}</td><td class="num">${(res.ms / 1000).toFixed(1)}s</td>`;
+  $("log").appendChild(tr); tr.scrollIntoView({ block: "nearest" });
+}
+
+/* ---------- 文件载入 ---------- */
+async function loadFile(file) {
+  if (!file) return;
+  if (!window.pdfjsLib) { setMsg("PDF 组件没有加载成功，请检查网络后刷新页面。", "err"); return; }
+  setMsg("正在读取 " + file.name + " …"); setBar(0);
+  try {
+    S.bytes = new Uint8Array(await file.arrayBuffer());
+    S.name = file.name.replace(/\.pdf$/i, "");
+    S.pdf = await pdfjsLib.getDocument({ data: S.bytes.slice(), disableFontFace: false }).promise;
+    S.numPages = S.pdf.numPages; S.result = null;
+    $("fileinfo").textContent = `${file.name} · ${S.numPages} 页 · ${(file.size / 1048576).toFixed(1)} MB`;
+    $("pv").max = S.numPages;
+    const rg = parseRange($("range").value, S.numPages);
+    $("pv").value = rg[0] || 1;
+    $("btn-run").disabled = false; $("btn-save").disabled = true; $("log").innerHTML = "";
+    setMsg("已载入，正在预览第 " + $("pv").value + " 页…");
+    await preview();
+  } catch (e) { setMsg("读取失败：" + (e.message || e), "err"); }
+}
+$("drop").addEventListener("click", () => $("file").click());
+$("drop").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+$("file").addEventListener("change", e => loadFile(e.target.files[0]));
+$("drop").addEventListener("dragover", e => { e.preventDefault(); $("drop").classList.add("on"); });
+$("drop").addEventListener("dragleave", () => $("drop").classList.remove("on"));
+$("drop").addEventListener("drop", e => { e.preventDefault(); $("drop").classList.remove("on"); loadFile(e.dataTransfer.files[0]); });
+
+/* ---------- 预览 ---------- */
+async function preview() {
+  if (!S.pdf) { runSample(); return; }
+  const no = Math.max(1, Math.min(S.numPages, +$("pv").value || 1));
+  const P = params();
+  $("btn-preview").disabled = true;
+  try {
+    setMsg(`渲染第 ${no} 页（${P.dpi} dpi）…`); await nextFrame();
+    const { img } = await renderPage(no, P.dpi);
+    const before = new ImageData(new Uint8ClampedArray(img.data), img.width, img.height);
+    setMsg(`处理第 ${no} 页…`); await nextFrame();
+    const res = processRGBA(img.data, img.width, img.height, P.dpi / 25.4, P);
+    showCompare(before, img);
+    setMsg(`第 ${no} 页：水印像素 ${res.n.toLocaleString()}，图框${res.fr ? "已去除" : (P.frame ? "未识别" : "未处理")}，用时 ${(res.ms / 1000).toFixed(1)} 秒。点击图面可放大核对。`, res.fr || !P.frame ? "ok" : "");
+  } catch (e) { setMsg("预览失败：" + (e.message || e), "err"); }
+  $("btn-preview").disabled = false;
+}
+$("btn-preview").addEventListener("click", preview);
+
+/* ---------- 批量 ---------- */
+async function runAll() {
+  const P = params();
+  let pages;
+  try { pages = parseRange($("range").value, S.numPages); } catch (e) { setMsg(e.message, "err"); return; }
+  if (!pages.length) { setMsg("页码范围里没有有效页。", "err"); return; }
+  const keep = $("out-keep").checked, inRange = new Set(pages);
+  $("btn-run").disabled = $("btn-preview").disabled = $("btn-save").disabled = true;
+  $("log").innerHTML = ""; setBar(0);
+  try {
+    const { PDFDocument, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject, PDFRawStream } = PDFLib;
+    const out = await PDFDocument.create();
+    let src = null;
+    if (keep && pages.length < S.numPages) { setMsg("载入原文件以保留范围外页面…"); await nextFrame(); src = await PDFDocument.load(S.bytes, { ignoreEncryption: true }); }
+    const order = keep ? Array.from({ length: S.numPages }, (_, i) => i + 1) : pages;
+    let done = 0; const t0 = performance.now();
+    for (const no of order) {
+      if (!inRange.has(no)) {
+        const [cp] = await out.copyPages(src, [no - 1]); out.addPage(cp); continue;
+      }
+      setMsg(`第 ${no} 页（${done + 1}/${pages.length}）…`); await nextFrame();
+      const { img, wPt, hPt } = await renderPage(no, P.dpi);
+      const W = img.width, H = img.height;
+      const show = done === 0 || no === +$("pv").value;
+      const before = show ? new ImageData(new Uint8ClampedArray(img.data), W, H) : null;
+      const res = processRGBA(img.data, W, H, P.dpi / 25.4, P);
+      if (show) showCompare(before, img);
+      const enc = encodeImage(img.data, W, H);
+      const dict = out.context.obj({
+        Type: "XObject", Subtype: "Image", Width: W, Height: H, BitsPerComponent: 8,
+        ColorSpace: enc.ch === 1 ? "DeviceGray" : "DeviceRGB", Filter: "FlateDecode",
+        DecodeParms: { Predictor: 15, Colors: enc.ch, BitsPerComponent: 8, Columns: W }
+      });
+      const ref = out.context.register(PDFRawStream.of(dict, enc.data));
+      const pg = out.addPage([wPt, hPt]);
+      const name = pg.node.newXObject("Im", ref);
+      pg.pushOperators(pushGraphicsState(), concatTransformationMatrix(wPt, 0, 0, hPt, 0, 0), drawObject(name), popGraphicsState());
+      logRow(no, W, H, res, (enc.ch === 1 ? "灰度 " : "彩色 ") + (enc.data.length / 1048576).toFixed(1) + " MB");
+      done++; setBar(done / pages.length);
+    }
+    setMsg("写出 PDF…"); await nextFrame();
+    S.result = await out.save({ useObjectStreams: false });
+    S.resultName = S.name + "_去水印去图框.pdf";
+    const secs = ((performance.now() - t0) / 1000).toFixed(0);
+    setMsg(`完成：处理 ${pages.length} 页，共输出 ${out.getPageCount()} 页，${(S.result.length / 1048576).toFixed(1)} MB，用时 ${secs} 秒。点“下载结果 PDF”保存。`, "ok");
+    $("btn-save").disabled = false;
+  } catch (e) { setMsg("处理失败：" + (e.message || e) + "（页面过大时可降低输出分辨率）", "err"); }
+  $("btn-run").disabled = $("btn-preview").disabled = false;
+}
+$("btn-run").addEventListener("click", runAll);
+
+/* ---------- 下载：平台下载能力；本地打开时退回普通下载 ---------- */
+let downloads = null;
+(async () => { try { if (window.claude && window.claude.use) downloads = await window.claude.use("downloads"); } catch (e) { downloads = null; } })();
+$("btn-save").addEventListener("click", async () => {
+  if (!S.result) return;
+  const blob = new Blob([S.result], { type: "application/pdf" });
+  if (downloads) {
+    try { await downloads.save({ filename: S.resultName, data: blob }); setMsg("已交给浏览器保存：" + S.resultName, "ok"); }
+    catch (e) { setMsg(e && e.code === "declined" ? "已取消保存。" : "保存没有成功：" + (e && (e.message || e.code)), e && e.code === "declined" ? "" : "err"); }
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = S.resultName;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  setMsg("已开始下载：" + S.resultName, "ok");
+});
+
+/* ===================== 内置示例：合成一张带水印和图框的图纸 ===================== */
+function makeSample() {
+  const W = 2100, H = 1485, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const c = cv.getContext("2d"); c.fillStyle = "#fff"; c.fillRect(0, 0, W, H);
+  c.strokeStyle = "#000"; c.lineWidth = 1; c.strokeRect(0.5, 0.5, W - 1, H - 1);
+  const L = 60, T = 22, R = W - 22, B = H - 22, TB = R - 150;
+  c.lineWidth = 9; c.strokeRect(L, T, R - L, B - T);
+  c.lineWidth = 3; c.beginPath(); c.moveTo(TB, T); c.lineTo(TB, B); c.stroke();
+  c.lineWidth = 1; c.font = "15px 'Noto Sans SC',sans-serif"; c.fillStyle = "#000";
+  const tbRows = ["设计单位", "证书编号", "建设单位", "项目名称", "图名", "设计", "校对", "审核", "图号", "日期"];
+  tbRows.forEach((t, i) => { const y = B - 40 - i * 46; c.beginPath(); c.moveTo(TB, y); c.lineTo(R, y); c.stroke(); c.fillText(t, TB + 10, y + 28); });
+  c.fillText("示例设计院", TB + 12, T + 40);
+  // 平面：双线墙
+  const X0 = 220, Y0 = 260, cw = 260, rh = 330;
+  c.lineWidth = 4;
+  for (let i = 0; i <= 6; i++) for (const d of [0, 10]) { c.beginPath(); c.moveTo(X0 + i * cw + d, Y0); c.lineTo(X0 + i * cw + d, Y0 + 2 * rh); c.stroke(); }
+  for (let j = 0; j <= 2; j++) for (const d of [0, 10]) { c.beginPath(); c.moveTo(X0, Y0 + j * rh + d); c.lineTo(X0 + 6 * cw + 10, Y0 + j * rh + d); c.stroke(); }
+  c.lineWidth = 1; c.strokeStyle = "rgb(128,128,128)";                       // 128 灰细线：应保留
+  for (let i = 0; i < 40; i++) { c.beginPath(); c.moveTo(X0 + 10 + i * 13, Y0 + rh + 12); c.lineTo(X0 + 10 + i * 13 - 60, Y0 + 2 * rh); c.stroke(); }
+  c.strokeStyle = "#000"; c.setLineDash([24, 6, 3, 6]);
+  for (let i = 0; i <= 6; i++) { c.beginPath(); c.moveTo(X0 + i * cw + 5, Y0 - 90); c.lineTo(X0 + i * cw + 5, Y0 + 2 * rh + 90); c.stroke(); }
+  c.setLineDash([]);
+  for (let i = 0; i <= 6; i++) { c.beginPath(); c.arc(X0 + i * cw + 5, Y0 - 112, 20, 0, 7); c.stroke(); c.fillText(String(i + 1), X0 + i * cw - 1, Y0 - 106); }
+  c.font = "26px 'Noto Sans SC',sans-serif";
+  ["卧室", "客厅", "厨房", "卫生间", "书房", "楼梯间"].forEach((t, i) => c.fillText(t, X0 + 70 + i * cw, Y0 + 170));
+  c.font = "700 34px 'Noto Sans SC',sans-serif"; c.fillText("示例一层平面图  1:100", X0 + 520, Y0 + 2 * rh + 170);
+  c.lineWidth = 3; c.beginPath(); c.moveTo(X0 + 520, Y0 + 2 * rh + 186); c.lineTo(X0 + 900, Y0 + 2 * rh + 186); c.stroke();
+  // 水印：正片叠底 128 灰斜排文字
+  const wmc = document.createElement("canvas"); wmc.width = W; wmc.height = H;
+  const w = wmc.getContext("2d"); w.fillStyle = "#fff"; w.fillRect(0, 0, W, H);
+  w.fillStyle = "rgb(128,128,128)"; w.font = "500 78px 'Noto Sans SC',sans-serif";
+  w.translate(W / 2, H / 2); w.rotate(-Math.PI / 4);
+  for (let y = -1400; y <= 1400; y += 380) for (let x = -1600; x <= 1600; x += 760) w.fillText("示例设计研究院水印", x - 360, y);
+  c.globalCompositeOperation = "multiply"; c.drawImage(wmc, 0, 0); c.globalCompositeOperation = "source-over";
+  return c.getImageData(0, 0, W, H);
+}
+function runSample() {
+  const P = params();
+  const img = makeSample(), before = new ImageData(new Uint8ClampedArray(img.data), img.width, img.height);
+  const ppm = img.width / 420;                       // 示例按 A3 宽 420mm 计
+  const res = processRGBA(img.data, img.width, img.height, ppm, P);
+  showCompare(before, img);
+  $("log").innerHTML = ""; logRow("示例", img.width, img.height, res, "—");
+  setMsg(`示例图：水印像素 ${res.n.toLocaleString()}，图框${res.fr ? "已去除" : "未识别"}。注意左下房间里的 128 灰斜线被保留。拖入你的 PDF 开始。`, "ok");
+}
+(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(() => setTimeout(runSample, 30));
+</script>
